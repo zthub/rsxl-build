@@ -19,10 +19,31 @@
         return res.ok;
       } catch (e) { return false; }
     }
+    function isPC() {
+      const ua = navigator.userAgent;
+      return !(/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua));
+    }
+    function keyCodeFor(key) {
+      switch (key) {
+        case 'ArrowLeft': return 37;
+        case 'ArrowUp': return 38;
+        case 'ArrowRight': return 39;
+        case 'ArrowDown': return 40;
+        default: return 0;
+      }
+    }
+    function dispatchKey(type, key, player) {
+      var keyCode = keyCodeFor(key);
+      var evt = new KeyboardEvent(type, { key: key, code: key, keyCode: keyCode, which: keyCode, bubbles: true });
+      try { Object.defineProperty(evt, 'keyCode', { get: function(){ return keyCode; } }); } catch(e){}
+      try { Object.defineProperty(evt, 'which', { get: function(){ return keyCode; } }); } catch(e){}
+      if (player) { player.dispatchEvent(evt); } else { document && document.dispatchEvent(evt); }
+    }
     document.addEventListener('DOMContentLoaded', async () => {
       const file = getParam('file');
       const bg = getParam('bg');
       const v = getParam('v');
+      const padRule = getParam('pad'); // 配置控制的虚拟键盘规则：'4' | '3' | '2'
       document.body.style.background = bg || '#111';
       const swfPath = file && file.includes('/') ? file : `../swf/${file}`;
       const swfUrl = `${swfPath}${v ? `?v=${v}` : ''}`;
@@ -40,6 +61,144 @@
       player.style.height = '100%';
       document.getElementById('player').appendChild(player);
       player.load(swfUrl);
+      // 虚拟方向键初始化（非PC且存在padRule时显示）
+      const pad = document.getElementById('virtual-pad');
+      if (!isPC() && padRule) {
+        pad.style.display = 'grid';
+        pad.style.gridTemplateRows = 'auto auto';
+        // 解析 padRule：支持 '4'|'3'|'2' 以及由字母组成的集合，如 'lrd'、'lr'、'ud'
+        function parsePad(rule) {
+          if (!rule) return [];
+          var r = String(rule).toLowerCase();
+          var letterMap = { l: 'ArrowLeft', r: 'ArrowRight', u: 'ArrowUp', d: 'ArrowDown' };
+          if (/^[lrud]+$/.test(r)) {
+            var arr = []; for (var i = 0; i < r.length; i++) { var ch = r.charAt(i); if (letterMap[ch]) arr.push(letterMap[ch]); }
+            return arr;
+          }
+          switch (r) {
+            case '4': return ['ArrowUp','ArrowLeft','ArrowDown','ArrowRight'];
+            case '3': return ['ArrowLeft','ArrowRight','ArrowDown']; // 默认三键为 左、右、下
+            case '2': return ['ArrowLeft','ArrowRight'];
+            default: return [];
+          }
+        }
+        var keys = parsePad(padRule);
+        if (!keys.length) { pad.style.display = 'none'; return; }
+        var has = function(k){ return keys.indexOf(k) >= 0; };
+        pad.innerHTML = (has('ArrowUp') ? '<div class="pad-row"><div class="pad-btn" data-key="ArrowUp">↑</div></div>' : '') +
+          '<div class="pad-row">' +
+            (has('ArrowLeft') ? '<div class="pad-btn" data-key="ArrowLeft">←</div>' : '') +
+            (has('ArrowDown') ? '<div class="pad-btn" data-key="ArrowDown">↓</div>' : '') +
+            (has('ArrowRight') ? '<div class="pad-btn" data-key="ArrowRight">→</div>' : '') +
+          '</div>';
+        try { player.focus && player.focus(); } catch(e){}
+        const target = player; // 将键盘事件分发到 Ruffle 播放器元素
+        const activeIntervals = new Map();
+        const pressTimers = new Map();
+        const autoReleaseTimers = new Map();
+        const pressedKeys = new Set();
+        // 全屏兼容：进入全屏时将虚拟键移入全屏元素，退出时移回
+        var padOriginalParent = pad.parentElement;
+        function handleFullscreenChange(){
+          var fe = document.fullscreenElement || document.webkitFullscreenElement;
+          var container = null;
+          if (fe) {
+            try {
+              container = (player && player.shadowRoot) ? player.shadowRoot : fe;
+              // 若在 Shadow DOM 中，需注入样式以保障虚拟键的子元素可见
+              if (container === player.shadowRoot) {
+                if (!container.querySelector('#pad-shadow-style')) {
+                  var styleEl = document.createElement('style');
+                  styleEl.id = 'pad-shadow-style';
+                  styleEl.textContent = '.virtual-pad{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:2147483647;display:grid;gap:12px;} .pad-row{display:flex;justify-content:center;gap:12px;} .pad-btn{width:56px;height:56px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;user-select:none;touch-action:manipulation;box-shadow:0 4px 12px rgba(0,0,0,0.25);} .pad-btn:active{background:rgba(0,0,0,0.8);}';
+                  container.appendChild(styleEl);
+                }
+              }
+              container.appendChild(pad);
+              // 全屏时使用固定定位确保相对屏幕定位
+              pad.style.position = 'fixed';
+              pad.style.zIndex = '2147483647';
+              pad.style.pointerEvents = 'auto';
+            } catch(e){}
+          } else {
+            try {
+              padOriginalParent && padOriginalParent.appendChild(pad);
+              pad.style.position = 'fixed';
+              pad.style.zIndex = '9999';
+              pad.style.pointerEvents = 'auto';
+            } catch(e){}
+          }
+        }
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        // 同时监听宿主元素，提升兼容性
+        player.addEventListener && player.addEventListener('fullscreenchange', handleFullscreenChange);
+        player.addEventListener && player.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        // 初始化一次，若已在全屏中
+        handleFullscreenChange();
+        function startKey(key) {
+          // 如已按下则忽略，避免重复触发造成一次跳多格
+          if (pressedKeys.has(key)) { return; }
+          pressedKeys.add(key);
+          try { player && player.focus && player.focus(); } catch(e){}
+          // 立即触发一次（单击只触发一次）
+          dispatchKey('keydown', key, target);
+          // 长按阈值后开始连续触发
+          const t = setTimeout(function(){
+            if (!pressedKeys.has(key)) return;
+            if (activeIntervals.has(key)) return;
+            const id = setInterval(function(){ dispatchKey('keydown', key, target); }, 120);
+            activeIntervals.set(key, id);
+          }, 300);
+          pressTimers.set(key, t);
+          // 兜底：若未收到结束事件（某些设备/浏览器偶发），自动释放，避免进入不可点击状态
+          const auto = setTimeout(function(){
+            if (pressedKeys.has(key) && !activeIntervals.has(key)) { endKey(key); }
+          }, 700);
+          autoReleaseTimers.set(key, auto);
+        }
+        function endKey(key) {
+          const t = pressTimers.get(key);
+          if (t) { clearTimeout(t); pressTimers.delete(key); }
+          const auto = autoReleaseTimers.get(key);
+          if (auto) { clearTimeout(auto); autoReleaseTimers.delete(key); }
+          const id = activeIntervals.get(key);
+          if (id) { clearInterval(id); activeIntervals.delete(key); }
+          if (pressedKeys.has(key)) {
+            pressedKeys.delete(key);
+            dispatchKey('keyup', key, target);
+          }
+        }
+        const btns = pad.querySelectorAll('.pad-btn');
+        var lastInputWasTouch = false;
+        var resetTouchFlagTimer = null;
+        btns.forEach(function(btn){
+          var key = btn.dataset.key;
+          var startTouch = function(e){
+            if (e) { e.preventDefault && e.preventDefault(); e.stopPropagation && e.stopPropagation(); }
+            lastInputWasTouch = true;
+            if (resetTouchFlagTimer) { clearTimeout(resetTouchFlagTimer); }
+            resetTouchFlagTimer = setTimeout(function(){ lastInputWasTouch = false; }, 500);
+            startKey(key);
+          };
+          var startMouse = function(e){
+            if (lastInputWasTouch) { return; }
+            if (e) { e.preventDefault && e.preventDefault(); e.stopPropagation && e.stopPropagation(); }
+            startKey(key);
+          };
+          var end = function(){ endKey(key); };
+          btn.addEventListener('touchstart', startTouch, { passive: false });
+          btn.addEventListener('touchend', end);
+          btn.addEventListener('touchcancel', end);
+          btn.addEventListener('mousedown', startMouse);
+          btn.addEventListener('mouseup', end);
+          btn.addEventListener('mouseleave', end);
+        });
+        // 页面切换/隐藏时做全局收尾，防止残留（单一定义）
+        const endAll = function(){ Array.from(pressedKeys).forEach(function(k){ endKey(k); }); };
+        window.addEventListener('blur', endAll);
+        document.addEventListener('visibilitychange', function(){ if (document.hidden) endAll(); });
+      }
     });
   </script>
   <style>
@@ -49,12 +208,28 @@
     .game { position: fixed; inset: 0; }
     #player, ruffle-embed, ruffle-player { width: 100%; height: 100%; }
     .missing { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; color: #fff; font-size: 18px; background: rgba(0,0,0,0.6); }
+    /* 虚拟方向键样式 */
+    .virtual-pad { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 9999; display: none; gap: 12px; }
+    .pad-row { display: flex; justify-content: center; gap: 12px; }
+    .pad-btn { width: 56px; height: 56px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; user-select: none; touch-action: manipulation; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+    .pad-btn:active { background: rgba(0,0,0,0.8); }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="game"><div id="player"></div></div>
     <div id="missing-msg" class="missing"></div>
+    <!-- 虚拟方向键覆盖层（非PC显示） -->
+    <div id="virtual-pad" class="virtual-pad">
+      <div class="pad-row">
+        <div class="pad-btn" data-key="ArrowUp">↑</div>
+      </div>
+      <div class="pad-row">
+        <div class="pad-btn" data-key="ArrowLeft">←</div>
+        <div class="pad-btn" data-key="ArrowDown">↓</div>
+        <div class="pad-btn" data-key="ArrowRight">→</div>
+      </div>
+    </div>
   </div>
 </body>
 </html>
