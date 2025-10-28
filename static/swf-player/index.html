@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SWF 播放器</title>
-  <script src="/static/swf-player/ruffle/ruffle.js"></script>
+  <!-- <script src="/static/swf-player/ruffle/ruffle.js"></script> -->
+   <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
+
   <script>
     window.RufflePlayer = window.RufflePlayer || {};
     window.RufflePlayer.config = { scale: 'fit', letterbox: 'off', quality: 'best' };
@@ -64,7 +66,7 @@
       player.load(swfUrl);
       // 虚拟方向键初始化（非PC且存在padRule时显示）
       const pad = document.getElementById('virtual-pad');
-      if (!isPC() && padRule) {
+      if (padRule) {
         var showDefault = padShow ? ((padShow === '1') || (String(padShow).toLowerCase() === 'true')) : true;
         pad.style.display = showDefault ? 'grid' : 'none';
         pad.style.gridTemplateRows = 'auto auto';
