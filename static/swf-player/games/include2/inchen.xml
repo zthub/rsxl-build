@@ -5,19 +5,19 @@
   <item name="0.5~0.6" url="05-06" />
   <item name="0.7~0.9" url="07-09" />
 </items>
-<items name="ѡ�񱳾�">
-  <item name="���ι�դ" url="X"/>
-  <item name="���ǹ�դ" url="S"/>
-  <item name="Բ�ι�դ" url="Y"/>
-  <item name="б�߹�դ" url="J"/>
-  <item name="��״��դ" url="C"/>
-  <item name="���ι�դ" url="W"/>
+<items name="xuanze beijing">
+  <item name="fangge guangzha" url="X"/>
+  <item name="sanjiao guangzha" url="S"/>
+  <item name="yuanxing guangzha" url="Y"/>
+  <item name="xiexian guangzha" url="J"/>
+  <item name="liantiao guangzha" url="C"/>
+  <item name="wangzhuang guangzha" url="W"/>
 </items>
 <items name="select game">
-<item name="dafeidei" url="games/dfd.swf" />
-<item name="chidouzi" url="games/cdz.swf" />
-<item name="sheji" url="games/sj.swf" />
-<item name="huangjinkuanggong" url="games/hjkg.swf" />
-<item name="zhili" url="games/zl.swf" />
-<item name="miaoxian" url="games/mx.swf" />
+  <item name="dafeidei" url="games/dfd.swf" />
+  <item name="chidouzi" url="games/cdz.swf" />
+  <item name="sheji" url="games/sj.swf" />
+  <item name="huangjinkuanggong" url="games/hjkg.swf" />
+  <item name="zhili" url="games/zl.swf" />
+  <item name="miaoxian" url="games/mx.swf" />
 </items>
