@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SWF 播放器</title>
-   <!-- <script src="/static/swf-player/ruffle/ruffle.js"></script> -->
-  <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
+  <!--<script src="/static/swf-player/ruffle/ruffle.js"></script> -->
+    <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
 
   <script>
     window.RufflePlayer = window.RufflePlayer || {};
@@ -84,16 +84,20 @@
             var arr = []; for (var i = 0; i < r.length; i++) { var ch = r.charAt(i); if (letterMap[ch]) arr.push(letterMap[ch]); }
             return arr;
           }
-          if (/^[1234]+$/.test(r)) {
-            var nums = []; for (var j = 0; j < r.length; j++) { var dj = r.charAt(j); if (/[1-4]/.test(dj)) nums.push(dj); }
-            return nums;
-          }
+          // 先处理简写数量：'4'|'3'|'2' 映射为方向键集合
           switch (r) {
             case '4': return ['ArrowUp','ArrowLeft','ArrowDown','ArrowRight'];
             case '3': return ['ArrowLeft','ArrowRight','ArrowDown']; // 默认三键为 左、右、下
             case '2': return ['ArrowLeft','ArrowRight'];
-            default: return [];
           }
+          // 再处理数字集合：如 '1234'、'12' 等，仅呈现指定的数字键
+          if (/^[1234]+$/.test(r)) {
+            var nums = []; for (var j = 0; j < r.length; j++) { var dj = r.charAt(j); if (/[1-4]/.test(dj)) nums.push(dj); }
+            // 去重并按 1-4 排序
+            var order = ['1','2','3','4']; var uniq = []; nums.forEach(function(k){ if (uniq.indexOf(k) < 0) uniq.push(k); }); uniq.sort(function(a,b){ return order.indexOf(a) - order.indexOf(b); });
+            return uniq;
+          }
+          return [];
         }
         var keys = parsePad(padRule);
         if (!keys.length) { pad.style.display = 'none'; return; }
@@ -102,12 +106,15 @@
         var numOnly = keys.every(function(k){ return ['1','2','3','4'].indexOf(k) >= 0; });
         pad.style.gridTemplateRows = (udOnly || numOnly) ? 'auto' : 'auto auto';
         pad.innerHTML = numOnly
-          ? '<div class="pad-row">\n' +
-              '<div class="pad-btn" data-key="1">1</div>' +
-              '<div class="pad-btn" data-key="2">2</div>' +
-              '<div class="pad-btn" data-key="3">3</div>' +
-              '<div class="pad-btn" data-key="4">4</div>' +
-            '</div>'
+          ? (function(){
+              var order = ['1','2','3','4'];
+              var html = '<div class="pad-row">';
+              order.forEach(function(n){
+                if (has(n)) { html += '<div class="pad-btn" data-key="'+n+'">'+n+'</div>'; }
+              });
+              html += '</div>';
+              return html;
+            })()
           : (udOnly
             ? '<div class="pad-row"><div class="pad-btn" data-key="ArrowUp">↑</div><div class="pad-btn" data-key="ArrowDown">↓</div></div>'
             : (has('ArrowUp') ? '<div class="pad-row"><div class="pad-btn" data-key="ArrowUp">↑</div></div>' : '') +
