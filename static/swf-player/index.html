@@ -4,9 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SWF 播放器</title>
-  <!--<script src="/static/swf-player/ruffle/ruffle.js"></script> -->
+  <!-- <script src="/static/swf-player/ruffle/ruffle.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/gh/zthub/rsxl@main/static/swf-player/ruffle/ruffle.js"></script>
+
     <!-- <script src="https://unpkg.com/@ruffle-rs/ruffle"></script> -->
-	<script src="https://rsxl-1301966675.cos-website.ap-shanghai.myqcloud.com/ruffle/ruffle.js"></script>
+	<!-- <script src="https://rsxl-1301966675.cos-website.ap-shanghai.myqcloud.com/ruffle/ruffle.js"></script> -->
 
   <script>
     window.RufflePlayer = window.RufflePlayer || {};
@@ -54,7 +56,7 @@
       const padRule = getParam('pad'); // 配置控制的虚拟键盘规则：'4' | '3' | '2' | 组合字母
       const padShow = getParam('padShow'); // 虚拟键盘默认显示(1/true)或隐藏(0/false)
       document.body.style.background = bg || '#111';
-      const swfPath = file && file.includes('/') ? file : `../swf/${file}`;
+      const swfPath = file && file.includes('/') ? file : `https://cdn.jsdelivr.net/gh/zthub/rsxl@main/static/swf/${file}`;
       const swfUrl = `${swfPath}${v ? `?v=${v}` : ''}`;
       const exists = file && await swfExists(swfUrl);
       if (!exists) {
